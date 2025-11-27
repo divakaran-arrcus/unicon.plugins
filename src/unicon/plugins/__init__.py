@@ -12,6 +12,7 @@ supported_os = [
     'aci',
     'aireos',
     'apic',
+    'arcos',
     'asa',
     'cheetah',
     'cimc',
