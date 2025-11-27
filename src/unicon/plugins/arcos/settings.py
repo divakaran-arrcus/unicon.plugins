@@ -27,6 +27,8 @@ class ArcosSettings(GenericSettings):
             r"Syntax error",
             r"syntax error",
             r"Error:",
+            r"Commit failed",
+            r"Configuration commit failed",
         ]
 
         # Configure mode settings

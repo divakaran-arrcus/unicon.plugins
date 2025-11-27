@@ -2,18 +2,16 @@
 
 Usage (from your pyATS venv):
 
+    # Set environment variables
+    export ARCOS_HOSTNAME=rtr1
+    export ARCOS_IP=10.9.206.2
+    export ARCOS_PORT=10001
+    export ARCOS_USERNAME=root
+    export ARCOS_PASSWORD=arrcus
+
     cd /Users/divakaran/arrcus_workspace/unicon.plugins
     source /Users/divakaran/arrcus_workspace/pyats_env/venv/bin/activate
-    python test_arcos_real.py
-
-This uses the following connection details (from testbed_test.yaml):
-
-- os: arcos
-- platform: arcos
-- ip: 10.9.206.2
-- port: 10001
-- username: root
-- password: arrcus
+    python src/unicon/plugins/tests/test_arcos_real.py
 
 Make sure your editable install of this fork is active:
 
@@ -24,35 +22,36 @@ before running this script, so that the ArcOS plugin from this repo is used.
 
 from __future__ import annotations
 
+import os
 import sys
 
 from unicon import Connection
 
 
-HOSTNAME = "rtr1"
-IP = "10.9.206.2"
-PORT = 10001
-USERNAME = "root"
-PASSWORD = "arrcus"
-
-
 def main() -> int:
+    # Read connection details from environment variables
+    hostname = os.getenv("ARCOS_HOSTNAME", "rtr1")
+    ip = os.getenv("ARCOS_IP", "10.9.206.2")
+    port = int(os.getenv("ARCOS_PORT", "10001"))
+    username = os.getenv("ARCOS_USERNAME", "root")
+    password = os.getenv("ARCOS_PASSWORD", "arrcus")
+
     conn = Connection(
-        hostname=HOSTNAME,
-        start=[f"ssh -p {PORT} {USERNAME}@{IP}"],
+        hostname=hostname,
+        start=[f"ssh -p {port} {username}@{ip}"],
         os="arcos",
         platform="arcos",
         credentials={
             "default": {
-                "username": USERNAME,
-                "password": PASSWORD,
+                "username": username,
+                "password": password,
             }
         },
         mit=True,
         log_buffer=True,
     )
 
-    print(f"Connecting to {HOSTNAME} ({IP}:{PORT}) with os='arcos'...")
+    print(f"Connecting to {hostname} ({ip}:{port}) with os='arcos'...")
     conn.connect()
     print("Connected. Current state:", conn.state_machine.current_state)
 
@@ -64,6 +63,7 @@ def main() -> int:
     output = conn.execute("show interface swp* | nomore")
     print(output)
 
+    print("\n=== Testing configuration with commit ===")
     config_str = """
 interface loopback11
  type    softwareLoopback
