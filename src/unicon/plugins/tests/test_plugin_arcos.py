@@ -37,6 +37,7 @@ class TestArcosPluginConnect(unittest.TestCase):
                 )
             ],
             os="arcos",
+            platform="arcos",
             username="root",
             password="arrcus",
             init_exec_commands=[],
@@ -61,6 +62,7 @@ class TestArcosPluginExecute(unittest.TestCase):
                 )
             ],
             os="arcos",
+            platform="arcos",
             username="root",
             password="arrcus",
             init_exec_commands=[],
