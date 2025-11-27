@@ -60,6 +60,27 @@ def main() -> int:
     output = conn.execute("show version")
     print(output)
 
+    print("\n=== Executing 'show interface swp*' ===")
+    output = conn.execute("show interface swp* | nomore")
+    print(output)
+
+    config_str = """
+interface loopback11
+ type    softwareLoopback
+ enabled true
+ subinterface 0
+  ipv4 address 11.11.11.11
+   prefix-length 32
+  exit
+  enabled true
+ exit
+ """
+    conn.configure(config_str)
+
+    print("\n=== Executing 'show interface loopback11' ===")
+    output = conn.execute("show interface loopback11 | nomore")
+    print(output)
+
     print("\nDisconnecting...")
     conn.disconnect()
     print("Disconnected.")
