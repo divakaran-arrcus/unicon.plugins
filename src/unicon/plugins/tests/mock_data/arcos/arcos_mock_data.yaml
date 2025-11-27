@@ -1,0 +1,18 @@
+bash:
+  prompt: "root@%N:~# "
+  commands:
+    "cli":
+      new_state: enable
+
+enable:
+  prompt: "root@%N# "
+  commands:
+    "term length 0": ""
+    "term width 0": ""
+    "show version": |2
+      ArcOS Software
+      Arrcus ArcOS mock version 1.0.0
+      Copyright (c) Arrcus, Inc.
+
+    "exit":
+      new_state: bash
