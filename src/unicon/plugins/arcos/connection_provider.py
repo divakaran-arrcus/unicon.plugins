@@ -18,18 +18,20 @@ class ArcosConnectionProvider(GenericSingleRpConnectionProvider):
     def get_connection_dialog(self):  # type: ignore[override]
         """Get the dialog for connection establishment.
 
+        Reuse the generic connection dialog (which is credential-aware)
+        and append ArcOS-specific statements.
+
         Returns:
             Dialog: Dialog with statements for handling connection prompts.
         """
-        dialog = Dialog(
+        base_dialog = super().get_connection_dialog()
+        arcos_dialog = Dialog(
             [
-                ArcosStatements.username_statement(self.connection.context),
-                ArcosStatements.password_statement(self.connection.context),
                 ArcosStatements.confirm_statement(),
                 ArcosStatements.press_return_statement(),
             ]
         )
-        return dialog
+        return base_dialog + arcos_dialog
 
     def establish_connection(self):  # type: ignore[override]
         """Establish connection to the device.
