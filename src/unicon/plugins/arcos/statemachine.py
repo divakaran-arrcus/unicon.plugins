@@ -4,12 +4,24 @@ Defines the state machine with states and transitions for ArcOS devices.
 """
 
 from unicon.statemachine import State, Path, StateMachine
+from unicon.eal.dialogs import Statement, Dialog
 
 from .patterns import ArcosPatterns
 from .statements import ArcosStatements
 
 
 patterns = ArcosPatterns()
+
+
+# Dialog to handle uncommitted changes when exiting config mode
+uncommitted_changes_dialog = Dialog([
+    Statement(
+        pattern=r".*" + patterns.uncommitted_changes_prompt + r".*",
+        action="sendline(no)",
+        loop_continue=True,
+        continue_timer=False,
+    ),
+])
 
 
 class ArcosStateMachine(StateMachine):
@@ -52,10 +64,12 @@ class ArcosStateMachine(StateMachine):
         exec_to_config = Path(exec_state, config, "config", None)
 
         # config -> enable: use 'end' command
-        config_to_exec = Path(config, exec_state, "end", None)
+        # Dialog handles "Uncommitted changes found, commit them?" prompt
+        config_to_exec = Path(config, exec_state, "end", uncommitted_changes_dialog)
 
         # config -> bash: use 'end' then 'exit' (multi-step transition)
-        config_to_bash = Path(config, bash, "end\rexit", None)
+        # Dialog handles "Uncommitted changes found, commit them?" prompt
+        config_to_bash = Path(config, bash, "end\rexit", uncommitted_changes_dialog)
 
         # ==================
         # Add states and paths to the state machine
