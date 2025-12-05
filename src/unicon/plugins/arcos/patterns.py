@@ -25,7 +25,10 @@ class ArcosPatterns:
     username_prompt = r"[Uu]sername:\s*$|[Ll]ogin:\s*$"
 
     # Are you sure prompts
-    confirm_prompt = r"\[confirm\]|\[yes/no\]"
+    confirm_prompt = r"\[confirm\]|\[yes/no\]|\[yes/no/CANCEL\]"
+
+    # Uncommitted changes prompt when exiting config mode
+    uncommitted_changes_prompt = r"Uncommitted changes found, commit them\?\s*\[yes/no/CANCEL\]"
 
     # Press return to continue
     press_return = r"Press RETURN to get started"

@@ -6,6 +6,10 @@ Implements configuration mode operations with automatic commit support.
 from unicon.plugins.generic.service_implementation import Configure as GenericConfigure
 from unicon.eal.dialogs import Statement, Dialog
 
+from ..patterns import ArcosPatterns
+
+patterns = ArcosPatterns()
+
 
 class Configure(GenericConfigure):
     """Configure service for ArcOS devices with automatic commit support.
@@ -36,7 +40,7 @@ class Configure(GenericConfigure):
         # Dialog to auto-answer unexpected commit prompts with "no" (defensive)
         commit_dialog = Dialog([
             Statement(
-                pattern=r".*Uncommitted changes found, commit them\?\s*\[yes/no/CANCEL\].*",
+                pattern=r".*" + patterns.uncommitted_changes_prompt + r".*",
                 action="sendline(no)",
                 loop_continue=True,
                 continue_timer=False,
