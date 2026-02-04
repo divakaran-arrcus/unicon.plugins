@@ -28,7 +28,8 @@ from time import sleep
 
 from unicon.bases.routers.services import BaseService
 from unicon.core.errors import SubCommandFailure, StateMachineError, \
-    CopyBadNetworkError, TimeoutError, UniconBackendDecodeError
+    CopyBadNetworkError, TimeoutError, UniconBackendDecodeError, \
+    UniconAuthenticationError, CredentialsExhaustedError
 from unicon.eal.dialogs import Dialog
 from unicon.eal.dialogs import Statement
 from unicon.plugins.generic.statements import (
@@ -47,6 +48,7 @@ from unicon.logs import UniconStreamHandler, UNICON_LOG_FORMAT
 
 from unicon.plugins.generic.utils import GenericUtils
 from .service_statements import execution_statement_list, configure_statement_list
+from .statements import disable_enable_transition_statements
 from unicon.plugins.generic.statemachine import config_transition
 
 utils = GenericUtils()
@@ -480,6 +482,7 @@ class Enable(BaseService):
         super().__init__(connection, context, **kwargs)
         self.start_state = 'enable'
         self.end_state = 'enable'
+        self.dialog = Dialog(disable_enable_transition_statements)
         self.__dict__.update(kwargs)
 
     def pre_service(self, *args, **kwargs):
@@ -491,7 +494,7 @@ class Enable(BaseService):
         handle = self.get_handle(target)
         spawn = self.get_spawn(target)
         sm = self.get_sm(target)
-        timeout = kwargs.get('timeout', None)
+        timeout = kwargs.get('timeout', None) or handle.settings.ENABLE_TIMEOUT
 
         # If the device is in rommon, enable() will use the
         # image_to_boot info to boot the image specified
@@ -511,9 +514,13 @@ class Enable(BaseService):
                      spawn,
                      context=handle.context,
                      timeout=timeout)
+        except (UniconAuthenticationError, CredentialsExhaustedError):
+            # Don't wrap auth errors - re-raise them directly
+            raise
         except Exception as err:
             raise SubCommandFailure("Failed to Bring device to Enable State",
                                     err) from err
+
         self.result = True
 
 
@@ -604,6 +611,7 @@ class Execute(BaseService):
         self.matched_retry_sleep = connection.settings.EXECUTE_MATCHED_RETRY_SLEEP
         self.state_change_matched_retries = connection.settings.EXECUTE_STATE_CHANGE_MATCH_RETRIES
         self.state_change_matched_retry_sleep = connection.settings.EXECUTE_STATE_CHANGE_MATCH_RETRY_SLEEP
+        self.detect_state = True
 
     def log_service_call(self):
         pass
@@ -620,11 +628,14 @@ class Execute(BaseService):
                      allow_state_change=None,
                      matched_retries=None,
                      matched_retry_sleep=None,
+                     detect_state=None,
                      *args, **kwargs):
         con = self.connection
         sm = self.get_sm()
         if allow_state_change is None:
             allow_state_change = con.settings.EXEC_ALLOW_STATE_CHANGE
+
+        self.detect_state = detect_state if detect_state is not None else self.detect_state
 
         timeout = timeout or self.timeout
 
@@ -682,24 +693,25 @@ class Execute(BaseService):
             if custom_auth_stmt:
                 dialog += Dialog(custom_auth_stmt)
 
-        # Add all known states to detect state changes.
-        for state in sm.states:
-            # The current state is already added by the service_dialog method
-            if state.name != sm.current_state:
-                if allow_state_change:
-                    dialog.append(Statement(
-                        pattern=state.pattern,
-                        matched_retries=self.state_change_matched_retries,
-                        matched_retry_sleep=self.state_change_matched_retry_sleep
-                    ))
-                else:
-                    dialog.append(Statement(
-                        pattern=state.pattern,
-                        action=invalid_state_change_action,
-                        args={'err_state': state, 'sm': sm},
-                        matched_retries=self.state_change_matched_retries,
-                        matched_retry_sleep=self.state_change_matched_retry_sleep
-                    ))
+        if self.detect_state:
+            # Add all known states to detect state changes.
+            for state in sm.states:
+                # The current state is already added by the service_dialog method
+                if state.name != sm.current_state:
+                    if allow_state_change:
+                        dialog.append(Statement(
+                            pattern=state.pattern,
+                            matched_retries=self.state_change_matched_retries,
+                            matched_retry_sleep=self.state_change_matched_retry_sleep
+                        ))
+                    else:
+                        dialog.append(Statement(
+                            pattern=state.pattern,
+                            action=invalid_state_change_action,
+                            args={'err_state': state, 'sm': sm},
+                            matched_retries=self.state_change_matched_retries,
+                            matched_retry_sleep=self.state_change_matched_retry_sleep
+                        ))
 
         # store the last used dialog, used by unittest
         self._last_dialog = dialog
@@ -926,7 +938,6 @@ class Configure(BaseService):
         if command:
             flat_cmd = self.utils.flatten_splitlines_command(command)
             dialog = self.dialog + self.service_dialog(handle=handle, service_dialog=reply)
-            sp = handle.spawn
             # Add all known states to detect state changes.
             for state in sm.states:
                 # The current state is already added by the service_dialog method
@@ -945,9 +956,23 @@ class Configure(BaseService):
                                 matched_retries=self.state_change_matched_retries,
                                 matched_retry_sleep=self.state_change_matched_retry_sleep
                             ))
+
+            banner_lines, command_lines, banner_delim = self.get_banner_lines(flat_cmd)
+
+            # Populate context for banner_text_handler only if banner was detected
+            if banner_lines:
+                self.connection.log.info('Banner detected, configuring banners without state detection')
+
+                # Send banner lines
+                for line in banner_lines:
+                    handle.spawn.sendline(line)
+                    time.sleep(0.1)
+                    handle.spawn.read_update_buffer()
+
+
             if bulk:
                 indicator = handle.settings.BULK_CONFIG_END_INDICATOR
-                cmd_lst = list(chain(flat_cmd, [indicator]))
+                cmd_lst = list(chain(command_lines, [indicator]))
                 if bulk_chunk_lines == 0:
                     chunks = [cmd_lst]
                 else:
@@ -955,28 +980,28 @@ class Configure(BaseService):
                               for i in range(0, len(cmd_lst), bulk_chunk_lines)]
                 for idx, chunk in enumerate(chunks, 1):
                     chunk_cmd = '\n'.join(chunk)
-                    sp.sendline(chunk_cmd)
+                    handle.spawn.sendline(chunk_cmd)
                     if idx != len(chunks):
                         sleep(bulk_chunk_sleep)
-                        sp.read_update_buffer()
+                        handle.spawn.read_update_buffer()
                     else:
                         try:
-                            sp.expect([indicator], timeout=timeout,
+                            handle.spawn.expect([indicator], timeout=timeout,
                                       trim_buffer=False)
-                            self.result, _, sp.buffer = \
-                                sp.buffer.rpartition(indicator)
+                            self.result, _, handle.spawn.buffer = \
+                                handle.spawn.buffer.rpartition(indicator)
                         except Exception as err:
                             raise SubCommandFailure('Configuration failed',
                                                     err) from err
                 self.process_dialog_on_handle(handle, dialog, timeout)
                 if self.commit_cmd:
-                    sp.sendline(self.commit_cmd)
+                    handle.spawn.sendline(self.commit_cmd)
                     self.process_dialog_on_handle(handle, dialog, timeout)
             else:
-                cmds = chain(flat_cmd, [self.commit_cmd]) \
-                    if self.commit_cmd else flat_cmd
+                cmds = chain(command_lines, [self.commit_cmd]) \
+                    if self.commit_cmd else command_lines
                 for cmd in cmds:
-                    sp.sendline(cmd)
+                    handle.spawn.sendline(cmd)
                     self.update_hostname_if_needed([cmd])
                     self.process_dialog_on_handle(handle, dialog, timeout)
                     # To handle the session
@@ -986,7 +1011,7 @@ class Configure(BaseService):
                         sleep(self.connection.settings.CONFIG_LOCK_RETRY_SLEEP)
                         config_transition(handle.state_machine, handle.spawn, handle.context)
                         handle.context['config_session_locked'] = False
-                        sp.sendline(cmd)
+                        handle.spawn.sendline(cmd)
                         self.process_dialog_on_handle(handle, dialog, timeout)
 
         # store config_result so it can be returned to the user later
@@ -1004,6 +1029,37 @@ class Configure(BaseService):
         self.get_service_result()
         # return the config_result to the user via self.result
         self.result = config_result
+
+
+    def get_banner_lines(self, config_lines):
+        """ Process lines related to the banner command
+        Args:
+            config_lines (list): list of config lines
+        Returns:
+            tuple: (banner_lines, command_lines, banner_delim)
+        """
+        banner_lines = []
+        command_lines = []
+        banner_delim = None
+
+        for line in config_lines:
+
+            match = re.match(r'^\s*banner\s+(login|motd|exec|incoming)\s+(\S)', line)
+            if match:
+                banner_lines.append(line)
+                banner_delim = match.group(2)
+                continue
+
+            if banner_delim:
+                banner_lines.append(line)
+                # End of banner when delimiter repeats as a full line
+                if line.strip() == banner_delim:
+                    banner_delim = None
+                continue
+
+            command_lines.append(line)
+
+        return banner_lines, command_lines, banner_delim
 
     def process_dialog_on_handle(self, handle, dialog, timeout):
         try:

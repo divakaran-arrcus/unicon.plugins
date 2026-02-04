@@ -129,6 +129,8 @@ class GenericSettings(Settings):
         self.SHOW_REDUNDANCY_CMD = 'sh redundancy stat | inc my state'
         self.REDUNDANCY_STATE_PATTERN = r'my state = (.*?)\s*$'
 
+        self.ENABLE_TIMEOUT = 30
+
         # Default error pattern
         self.ERROR_PATTERN = [r"% Invalid command at",
                               r"% Invalid input detected at",

@@ -498,5 +498,21 @@ class MaintenanceMode(ContextMgrBaseService):
         self.service_name = 'maintenance'
         self.start_state = "enable"
         self.end_state = "enable"
-
         self.__dict__.update(kwargs)
+
+
+class Enable(GenericEnable):
+
+    def call_service(self, target=None, command='', *args, **kwargs):
+        super().call_service(target=target, command=command, *args, **kwargs)
+
+        handle = self.get_handle(target)
+        spawn = self.get_spawn(target)
+        timeout = kwargs.get('timeout', None) or handle.settings.ENABLE_TIMEOUT
+
+        # explicit enable
+        handle.sendline(command or 'enable')
+        dialog = self.service_dialog(service_dialog=self.dialog)
+        dialog.process(spawn, timeout=timeout,
+                       context=handle.context,
+                       prompt_recovery=self.prompt_recovery)

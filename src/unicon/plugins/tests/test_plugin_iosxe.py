@@ -12,7 +12,6 @@ import os
 import time
 import unittest
 from unittest.mock import patch
-
 from pyats.topology import loader
 from unittest.mock import Mock
 
@@ -380,13 +379,13 @@ class TestIosXEPluginDisableEnable(unittest.TestCase):
         self.assertEqual(c.spawn.match.match_output, 'disable\r\nRouter>')
 
         r = c.enable()
-        self.assertEqual(c.spawn.match.match_output, 'cisco\r\nRouter#')
+        self.assertEqual(c.spawn.match.match_output, 'enable\r\nRouter#')
 
         r = c.disable()
         self.assertEqual(c.spawn.match.match_output, 'disable\r\nRouter>')
 
         r = c.enable(command='enable 7')
-        self.assertEqual(c.spawn.match.match_output, 'cisco\r\nRouter#')
+        self.assertEqual(c.spawn.match.match_output, 'enable 7\r\nRouter#')
 
         c.disconnect()
 
@@ -802,6 +801,10 @@ class TestIosXEC8KvPluginReload(unittest.TestCase):
     def test_reload(self):
         self.c.settings.POST_RELOAD_WAIT = 1
         self.c.reload(grub_boot_image='GOLDEN')
+
+    def test_golden_image(self):
+        self.c.settings.POST_RELOAD_WAIT = 1
+        self.c.reload(grub_boot_image='GOLDEN IMAGE')
 
     def test_rommon(self):
         self.c.rommon(config_register="0x40")
@@ -1710,6 +1713,59 @@ class TestIosxeSyntaxConfigure(unittest.TestCase):
             'description test'
         ]
         c.configure(config_txt, config_syntax_check='my_config')
+        c.disconnect()
+
+
+class TestIosxeMultipleBannerConfigure(unittest.TestCase):
+
+    def test_multiple_banner_configure(self):
+        """
+        Test that device.configure is called correctly for basic
+        banner configuration without an ACM configlet.
+        This test now asserts on the 'mock data' passed to configure.
+        """
+        c = Connection(
+            hostname='PE1',
+            start=['mock_device_cli --os iosxe --state general_config --hostname PE1'],
+            os='iosxe',
+            mit=True
+        )
+        c.connect()
+        banner_config ='''
+banner login *
+Updated - Unauthorized access to this device is strictly prohibited.
+Please contact corpnet@fb.com with any access requests.
+Done
+*
+'''
+
+        c.configure(banner_config)
+        c.disconnect()
+
+class TestIosxeBannerACM(unittest.TestCase):
+    '''
+    Testcase to test banner using acm terminal input.
+    '''
+    def test_banner_acm(self):
+        """
+        Test to configure banner using acm.
+        """
+        c = Connection(
+            hostname='PE1',
+            start=['mock_device_cli --os iosxe --state general_enable --hostname PE1'],
+            os='iosxe',
+            mit=True
+        )
+        c.connect()
+        bnr = '''
+banner login %
+Updated - Unauthorized access to this device is strictly prohibited.
+Please contact corpnet@fb.com with any access requests.
+Done
+%
+'''
+
+        c.configure(bnr, acm_configlet='my_config')
         c.disconnect()
 
 class TestConfigTransition(unittest.TestCase):

@@ -155,7 +155,7 @@ def boot_image(spawn, context, session):
             spawn.settings.MAX_BOOT_ATTEMPTS:
         if "boot_cmd" in context:
             cmd = context.get('boot_cmd')
-        elif "image_to_boot" in context:
+        elif context.get('image_to_boot', '').strip():
             cmd = "boot {}".format(context['image_to_boot']).strip()
         elif spawn.settings.FIND_BOOT_IMAGE:
             filesystem = spawn.settings.BOOT_FILESYSTEM if \

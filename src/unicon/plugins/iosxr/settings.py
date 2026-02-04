@@ -69,3 +69,5 @@ class IOSXRSettings(GenericSettings):
         # commands to send to get the device to respond
         # for XR devices, use Ctrl-Q (\x11) as alternative command
         self.ESCAPE_CHAR_PROMPT_COMMANDS = ['\r', '\x11']
+
+        self.AVOID_STATE_DETECTION_COMMANDS = ['show context']

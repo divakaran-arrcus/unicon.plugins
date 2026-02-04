@@ -55,6 +55,12 @@ class Execute(svc.Execute):
             sm.go_to('enable',
                      self.connection.spawn,
                      timeout=self.connection.spawn.settings.EXEC_TIMEOUT)
+
+        # Avoid state detection for certain commands
+        cmd = args[0] if args else kwargs.get('command', '')
+        if cmd and cmd in self.connection.settings.AVOID_STATE_DETECTION_COMMANDS:
+            self.detect_state = False
+
         super().pre_service(*args, **kwargs)
 
 

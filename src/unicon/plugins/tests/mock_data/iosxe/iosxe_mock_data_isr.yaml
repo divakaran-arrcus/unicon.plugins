@@ -152,7 +152,10 @@ enable_isr:
 
     "disable":
       new_state: isr_exec
-
+    "enable":
+      new_state: enable_isr
+    "enable 7":
+      new_state: enable_isr
     "ping":
       new_state: ping_proto_isr
 

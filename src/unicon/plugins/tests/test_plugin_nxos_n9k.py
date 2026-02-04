@@ -45,6 +45,21 @@ class TestNxos9kPluginReloadService(unittest.TestCase):
             self.dev.reload(image_to_boot='WrongImage.system.gbin')
         self.dev.disconnect()
 
+class TestNxosN9KAttachConsole(unittest.TestCase):
+
+    def test_attach_console(self):
+        c = Connection(hostname='LEAF',
+                       start=['mock_device_cli --os nxos --state n9k_connect2'],
+                       os='nxos',
+                       platform='n9k',
+                       username='cisco',
+                       tacacs_password='cisco',
+                       enable_password='cisco'
+        )
+        c.connect()
+        with c.attach_console(module_num=1) as mod:
+            mod.execute('show version')
+        c.disconnect()
 
 if __name__ == "__main__":
     unittest.main()

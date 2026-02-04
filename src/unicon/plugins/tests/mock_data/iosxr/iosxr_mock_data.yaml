@@ -386,6 +386,13 @@ enable:
     "monitor interface eth0":
       new_state: monitor_interface_iface
 
+    "show context":
+        response: |
+          #0  0x00007f9b428c5aac
+          #1  0x00007f9b428c5aac
+        timing:
+        - 0:,1,0.5,0.05
+
 half_confirm_prompt:
   prompt: "Clear logging buffer [confirm] [y"
   commands:
@@ -856,6 +863,7 @@ config_line2:
     "line default":
       new_state: config_line2
 
+
 bash_console2:
   prompt: "#"
   commands:
@@ -863,6 +871,7 @@ bash_console2:
       /disk0:/usr
     "exit":
       new_state: enable2
+
 
 admin2:
   prompt: "RP/0/0/CPU0:%N(admin)#"

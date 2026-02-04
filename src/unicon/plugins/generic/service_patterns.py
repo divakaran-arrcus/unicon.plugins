@@ -99,7 +99,7 @@ class PingPatterns():
         self.verbomode = r'^.*Verbose mode\? \[.+\]\s?: $'
         self.ext_cmds_source = r'^.*Source .*address( or interface)?\s?: $'
         self.tos = r'^.*Type of service \[.+\]\s?: $'
-        self.validate = r'^.*Validate reply data\? \[.+\]\s?: $'
+        self.validate = r'^.*Validate reply data\?\s*\[.+\]:\s*$'
         self.data_pattern = r'^.*Data pattern \[.+\]\s?: $'
         self.dfbit_header = r'^.*Set DF bit in IP header(\?)? \[.+\]\s?: $'
         self.dscp = r'^.*DSCP .*\[.+\]\s?: $'

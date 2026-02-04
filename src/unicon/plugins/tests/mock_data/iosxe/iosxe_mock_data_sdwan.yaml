@@ -165,6 +165,8 @@ sdwan_controller_mode_1:
   prompt: "%N>"
   commands:
     "show version | include operating mode": "Router operating mode: Controller-Managed"
+    "pnpa service discovery stop":
+      new_state: sdwan_controller_mode_enable_1
     "enable":
       new_state: sdwan_controller_mode_enable_1
 
@@ -235,6 +237,8 @@ sdwan_controller_mode_2:
   prompt: "%N>"
   commands:
     "show version | include operating mode": "Router operating mode: Controller-Managed"
+    "pnpa service discovery stop":
+      new_state: sdwan_controller_mode_enable_2
     "enable":
       new_state: sdwan_controller_mode_enable_2
 
@@ -310,6 +314,8 @@ sdwan_controller_mode_3:
   prompt: "%N>"
   commands:
     "show version | include operating mode": "Router operating mode: Controller-Managed"
+    "pnpa service discovery stop":
+      new_state: sdwan_controller_mode_enable_3
     "enable":
       new_state: sdwan_controller_mode_enable_3
 

@@ -120,8 +120,7 @@ switchover_fail = Statement(pattern=switchover_fail_pattern,
 stack_switchover_stmt_list = [save_config, proceed_sw, commit_changes,
                               term_state, gen_rsh_key, auto_pro, secure_passwd,
                               build_config, sw_init, user_acc, switch_prompt,
-                              found_return, switchover_fail]
-
+                              found_return, switchover_fail, dis_state]
 # reload service statements
 reload_pat = StackIosXEReloadPatterns()
 
