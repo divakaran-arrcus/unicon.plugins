@@ -144,13 +144,13 @@ class TestIosXEQuadDisableEnable(unittest.TestCase):
         self.assertEqual(d.spawn.match.match_output, 'disable\r\nRouter>')
 
         d.enable()
-        self.assertEqual(d.spawn.match.match_output, 'cisco\r\nRouter#')
+        self.assertEqual(d.spawn.match.match_output, 'enable\r\nRouter#')
 
         d.disable(target='standby')
         self.assertEqual(d.standby.spawn.match.match_output, 'disable\r\nRouter-stby>')
 
         d.enable(target='standby')
-        self.assertEqual(d.standby.spawn.match.match_output, 'cisco\r\nRouter-stby#')
+        self.assertEqual(d.standby.spawn.match.match_output, 'enable\r\nRouter-stby#')
 
         d.disconnect()
 

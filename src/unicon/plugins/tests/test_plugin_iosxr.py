@@ -188,6 +188,25 @@ class TestIosXRPluginExecute(unittest.TestCase):
     def test_execute_error_pattern_negative(self):
         self.c.execute('not a real command partial')
 
+    def test_execute_show_context(self):
+        md = MockDeviceTcpWrapperIOSXR(port=0, state='enable')
+        md.start()
+        conn = Connection(hostname='Router',
+                          start=['telnet 127.0.0.1 {}'.format(md.ports[0])],
+                          os='iosxr',
+                          username='admin',
+                          tacacs_password='admin')
+
+        expected_output = '#0  0x00007f9b428c5aac\r\n#1  0x00007f9b428c5aac'
+
+        try:
+            conn.connect()
+            out = conn.execute('show context')
+            self.assertEqual(out, expected_output)
+            conn.disconnect()
+        finally:
+            md.stop()
+
 
 class TestIosXrPluginPrompts(unittest.TestCase):
     """Tests for prompt handling."""
@@ -314,6 +333,7 @@ class TestIosXrPluginBashService(unittest.TestCase):
         self.assertIn('Router#', ret)
         conn.disconnect()
 
+
     def test_bash2(self):
         conn = Connection(hostname='Router',
                           start=['mock_device_cli --os iosxr --state enable2'],
@@ -329,6 +349,7 @@ class TestIosXrPluginBashService(unittest.TestCase):
         self.assertIn('exit', ret)
         self.assertIn('Router#', ret)
         conn.disconnect()
+
 
     def test_admin_bash2(self):
         conn = Connection(hostname='Router',

@@ -586,11 +586,16 @@ class GenericStatements():
         '''
          All generic Statements
         '''
+        # This statement has retries to wait for other messages before
+        # calling the escape handler.
         self.escape_char_stmt = Statement(pattern=pat.escape_char,
                                           action=escape_char_callback,
                                           args=None,
                                           loop_continue=True,
-                                          continue_timer=False)
+                                          continue_timer=False,
+                                          matched_retries=1,
+                                          matched_retry_sleep=1)
+
         self.press_return_stmt = Statement(pattern=pat.press_return,
                                            action=wait_and_enter, args=None,
                                            loop_continue=True,
@@ -798,10 +803,13 @@ generic_statements = GenericStatements()
 # Initial connection Statements
 #############################################################
 
-pre_connection_statement_list = [generic_statements.escape_char_stmt,
+pre_connection_statement_list = [# Ensure connection error statements are at the top to handle failures
+                                 # before other statements
+                                 generic_statements.connection_refused_stmt,
+                                 # other statements
+                                 generic_statements.escape_char_stmt,
                                  generic_statements.press_return_stmt,
                                  generic_statements.continue_connect_stmt,
-                                 generic_statements.connection_refused_stmt,
                                  generic_statements.disconnect_error_stmt,
                                  generic_statements.hit_enter_stmt,
                                  generic_statements.press_ctrlx_stmt,
@@ -851,3 +859,8 @@ connection_statement_list = \
     authentication_statement_list + \
     initial_statement_list + \
     pre_connection_statement_list
+
+disable_enable_transition_statements = [generic_statements.password_stmt,
+                                        generic_statements.enable_password_stmt,
+                                        generic_statements.bad_password_stmt,
+                                        generic_statements.syslog_stripper_stmt]

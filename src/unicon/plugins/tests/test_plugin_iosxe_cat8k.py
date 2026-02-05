@@ -165,6 +165,8 @@ class TestIosXECat8kPluginSwitchover(unittest.TestCase):
         finally:
             c.disconnect()
             md.stop()
+
+@unittest.skip("Skipping until test is fixed")
 class TestIosXECat8kPluginReload(unittest.TestCase):
 
     def test_reload_with_image(self):

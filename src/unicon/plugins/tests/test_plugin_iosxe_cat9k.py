@@ -481,6 +481,62 @@ class TestIosXeCat9kPlugin(unittest.TestCase):
             c.disconnect()
             md.stop()
 
+    def test_connect_ewlc_with_digits(self):
+        """Test connection to eWLC device with hostname containing digits."""
+        d = Connection(
+            hostname='eWLC',
+            start=['mock_device_cli --os iosxe --state c9k_login --hostname eWLC-Lab-01'],
+            os='iosxe',
+            platform='cat9k',
+            type='wlc',
+            credentials=dict(default=dict(username='admin', password='cisco')),
+            settings=dict(POST_DISCONNECT_WAIT_SEC=0, GRACEFUL_DISCONNECT_WAIT_SEC=0.2),
+            learn_hostname=True,
+            log_buffer=True
+        )
+        try:
+            d.connect()
+            self.assertEqual(d.hostname, 'eWLC-Lab-01')
+            self.assertEqual(d.state_machine.current_state, 'enable')
+        finally:
+            d.disconnect()
+
+    def test_connect_ewlc_ha_reload(self):
+        """Test eWLC HA reload with hostname pattern recognition during reconnection."""
+        md = MockDeviceTcpWrapperIOSXECat9k(
+            hostname='eWLC-APREG-ITHACA-TB32',
+            port=0,
+            state='cat9k_ha_active_escape,cat9k_ha_standby_escape'
+        )
+        md.start()
+
+        c = Connection(
+            hostname='ewlc',
+            start=[
+                'telnet 127.0.0.1 {}'.format(md.ports[0]),
+                'telnet 127.0.0.1 {}'.format(md.ports[1]),
+            ],
+            os='iosxe',
+            platform='cat9k',
+            type='wlc',
+            credentials=dict(
+                default=dict(username='cisco', password='cisco'),
+                alt=dict(username='admin', password='lab')
+            ),
+            settings=dict(POST_DISCONNECT_WAIT_SEC=0, GRACEFUL_DISCONNECT_WAIT_SEC=0.2),
+            learn_hostname=True,
+            log_buffer=True
+        )
+        try:
+            c.connect()
+            c.settings.POST_RELOAD_WAIT = 1
+            c.reload()
+            self.assertEqual(c.state_machine.current_state, 'enable')
+            self.assertEqual(c.hostname, 'eWLC-APREG-ITHACA-TB32')
+        finally:
+            c.disconnect()
+            md.stop()
+
 
 class TestIosXECat9kPluginReload(unittest.TestCase):
 

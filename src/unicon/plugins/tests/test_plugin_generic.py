@@ -24,6 +24,7 @@ from unicon.plugins.utils import sanitize
 from unicon.plugins.tests.mock.mock_device_ios import MockDeviceTcpWrapperIOS
 from unicon.mock.mock_device import MockDevice, MockDeviceTcpWrapper
 from unicon.plugins.generic.statements import login_handler, password_handler, passphrase_handler
+from unicon.plugins.generic.statemachine import config_transition
 from pyats.topology import loader
 from pyats.topology.credentials import Credentials
 
@@ -768,6 +769,49 @@ class TestConfigureService(unittest.TestCase):
         c.configure(['line console', 'exit', 'exit'])
         self.assertEqual(c.state_machine.current_state, 'enable')
         c.disconnect()
+
+    def test_config_transition_exits_when_exclusive(self):
+        class FakeState:
+            def __init__(self, pattern):
+                self.pattern = pattern
+        class FakeStateMachine:
+            config_command = 'config term'
+
+            def __init__(self):
+                self.current_state = 'enable'
+
+            def get_state(self, name):
+                return FakeState(pattern=name)
+
+            def detect_state(self, spawn):
+                self.current_state = 'enable'
+
+            def go_to(self, target, spawn):
+                self.current_state = 'exclusive'
+        class FakeSpawn:
+            def __init__(self):
+                self.sent = []
+                self.settings = AttrDict(
+                    CONFIG_LOCK_RETRY_SLEEP=0,
+                    CONFIG_LOCK_RETRIES=1,
+                    CONFIG_TIMEOUT=1,
+                )
+                self.log = logging.getLogger(__name__)
+                self.buffer = ''
+
+            def sendline(self, cmd=''):
+                self.sent.append(cmd)
+
+        sm = FakeStateMachine()
+        spawn = FakeSpawn()
+
+        with patch.object(Dialog, 'process', return_value=None):
+            config_transition(sm, spawn, context={})
+
+        self.assertGreaterEqual(len(spawn.sent), 2)
+        self.assertEqual(spawn.sent[0], 'config term')
+        self.assertEqual(spawn.sent.count('config term'), 1)
+        self.assertEqual(sm.current_state, 'exclusive')
 
     @classmethod
     def tearDownClass(cls):
@@ -1520,6 +1564,24 @@ class TestGenericConnectionRefused(unittest.TestCase):
                 d.disconnect()
                 md.stop()
 
+    def test_connection_refused_ssh(self):
+        
+        c = Connection(hostname='Router',
+                            start=['mock_device_cli --os iosxe --state connect_ssh_refuse'],
+                            os='ios',
+                            username='cisco',
+                            enable_password='cisco',
+                            tacacs_password='cisco',
+                            # init_exec_commands=[],
+                            init_config_commands=[],
+                            debug=True
+                            )
+        with self.assertRaisesRegex(unicon.core.errors.ConnectionError,
+                'failed to connect to Router'):
+            try:
+                c.connect()
+            finally:
+                c.disconnect()
 
 if __name__ == "__main__":
     unittest.main()

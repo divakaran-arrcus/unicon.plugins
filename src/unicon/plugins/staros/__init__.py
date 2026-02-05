@@ -28,6 +28,7 @@ class StarosServiceList(ServiceList):
         self.execute = svc.Execute
         self.configure = staros_svc.Configure
         self.monitor = staros_svc.Monitor
+        self.enable = svc.Enable
 
 
 class StarosConnection(GenericSingleRpConnection):

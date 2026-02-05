@@ -492,6 +492,8 @@ general_config:
       new_state: macro_prompt_brace
     "wsma agent exec":
       new_state: wsma_agent
+    "banner login *":
+      new_state: banner_config_state
 
 wsma_agent:
   prompt: "%N(wsma-exec-agent)#"
@@ -692,10 +694,17 @@ diol_exec:
   prompt: "RouterRP> "
   commands:
     "show version | include operating mode": ""
-    "enable": ""
+    "enable":
+      new_state: diol_enable
 
 diol_enable:
   prompt: "RouterRP# "
+  commands:
+    "show version | include operating mode": ""
+    "enable": ""
+
+diol_standby_enable:
+  prompt: "RouterRP-standby#"
   commands:
     "show version | include operating mode": ""
     "enable": ""
@@ -704,8 +713,8 @@ diol_disable:
   prompt: "RouterRP-standby> "
   commands:
     "show version | include operating mode": ""
-    "enable": ""
-
+    "enable":
+      new_state: diol_standby_enable
 
 
 config_with_msgs:
@@ -1555,6 +1564,7 @@ meraki_container_ssh:
   prompt: "44-b6-be-0e-56-00-SFO-SMK-N-CA-switch:~$"
   commands:
     "show version | include operating mode": ""
+    "enable": ""
 
 
 general_enable_long_hostname:
@@ -1570,11 +1580,34 @@ tclsh:
     "exit":
       new_state: general_enable
 
+banner_config_state: 
+  prompt: ""
+  commands:
+    "Updated - Unauthorized access to this device is strictly prohibited.": ""
+    "Please contact corpnet@fb.com with any access requests.": ""
+    "Done": ""
+    "*":
+      new_state: general_config
+
+acm_configlet_banner_input_percent:
+  prompt: ""
+  commands:
+    "Updated - Unauthorized access to this device is strictly prohibited.": ""
+    "Please contact corpnet@fb.com with any access requests.": ""
+    "Done": ""
+    "%":
+      new_state: acm_configlet
+
 acm_configlet:
   prompt: "%N(acm)#"
   commands:
     "interface loopback 1":
       new_state: acm_if
+    "banner login %":
+      response: "Enter TEXT message. End with the character '%'."
+      new_state: acm_configlet_banner_input_percent
+    "end":
+      new_state: general_enable
 
 acm_if:
   prompt: "%N(acm-if)#"
@@ -1746,6 +1779,13 @@ connection_refused:
         telnet: connect to address 127.0.0.1: Connection refused
       new_state: transition_to_general_enable1
 
+
+connect_ssh_refuse:
+  preface: |
+    Received disconnect from 127.0.0.1 port 22:2:  Requested line is busy!
+    Disconnected from 127.0.0.1 port 22
+  new_state: transition_to_general_enable1
+  
 transition_to_general_enable1:
   commands:
     "":

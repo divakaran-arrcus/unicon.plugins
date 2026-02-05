@@ -1,10 +1,20 @@
 
+n9k_connect2:
+  preface: Escape character is '^]'.
+  prompt: ""
+  commands:
+    "":
+      new_state: n9k_exec2
+
 n9k_exec2:
   prompt: "%N#"
   commands: &n9k_exec2_commands
     "term length 0": ""
     "term width 511": ""
     "terminal session-timeout 0": ""
+    "run bash rlogin lc1":
+      prompt: "module-1#"
+      new_state: n9k_module_console
     "config term":
       new_state: n9k_config2
 
@@ -485,3 +495,29 @@ n9k_boot_shell:
       drwxrwxrwx  2 root root    40 Feb 20 00:51 vsh
     "exit":
       new_state: n9k_boot
+
+n9k_module_console:
+  prompt: "module-1#"
+  commands:
+    "show version": 
+      response: |
+      
+        Software
+          BIOS:      version 03.48
+          BIOS compile time:       04/24/2018
+
+          system:    version 10.6(3) [build 10.6(2)IMG9(0.63)]
+
+          system compile time:     3/31/2026 31:00:00 [01/01/1970 00:00:00]
+
+
+        Hardware
+        RAM 8114304 kB
+            bootflash: 0 blocks (block size 512b)
+
+        lc1   uptime is 4 days 11 hours 10 minute(s) 57 second(s)
+    "exit":
+      response: |
+        
+        rlogin: Connection to lc1 closed normally.
+      new_state: n9k_exec2

@@ -25,7 +25,7 @@ from unicon.eal.dialogs import Dialog, Statement
 from .statements import (authentication_statement_list,
                          default_statement_list,
                          buffer_settled,
-                         buffer_wait)
+                         disable_enable_transition_statements)
 
 patterns = GenericPatterns()
 statements = GenericStatements()
@@ -83,7 +83,7 @@ def config_transition(statemachine, spawn, context):
             sleep(wait_time)
             spawn.sendline()
             statemachine.go_to('any', spawn)
-            if statemachine.current_state == 'config':
+            if statemachine.current_state in ('config', 'exclusive'):
                 spawn.sendline()
                 return
 
@@ -123,11 +123,7 @@ class GenericSingleRpStateMachine(StateMachine):
         enable_to_disable = Path(enable, disable, 'disable', Dialog([statements.syslog_msg_stmt]))
         enable_to_rommon = Path(enable, rommon, 'reload', None)
         enable_to_config = Path(enable, config, config_transition, Dialog([statements.syslog_msg_stmt]))
-        disable_to_enable = Path(disable, enable, 'enable',
-                                 Dialog([statements.password_stmt,
-                                         statements.enable_password_stmt,
-                                         statements.bad_password_stmt,
-                                         statements.syslog_stripper_stmt]))
+        disable_to_enable = Path(disable, enable, 'enable', Dialog(disable_enable_transition_statements))
         config_to_enable = Path(config, enable, 'end', Dialog([statements.syslog_msg_stmt]))
         rommon_to_disable = Path(rommon, disable, 'boot',
                                  Dialog(authentication_statement_list))
