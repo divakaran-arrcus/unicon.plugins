@@ -45,3 +45,15 @@ class ArcosPatterns:
 
     # Error messages
     error_pattern = r"(% Error|% Invalid|Syntax error|syntax error)"
+
+    # Load override patterns (used by the Load service)
+    # Matches: "20.98 KiB parsed in 13.94 sec (1.50 KiB/sec)"
+    load_success = r"\d+\.\d+ \S+iB parsed in \d+\.\d+ sec"
+    # Matches: "Error: failed to open file: File/directory does not exist."
+    load_error = r"Error:[^\r\n]+"
+    # Matches: "Proceed? [yes,no] |"  (spinner char follows but is optional)
+    commit_proceed = r"Proceed\?\s+\[yes,no\]"
+    # Matches: "Commit complete."
+    commit_complete = r"Commit complete"
+    # Matches: "Aborted: '': Deletion of front panel interface 'swp1' is not allowed."
+    commit_aborted = r"Aborted:[^\r\n]+"
