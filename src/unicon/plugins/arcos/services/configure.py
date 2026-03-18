@@ -98,9 +98,16 @@ class Configure(GenericConfigure):
         _commit_error = None
 
         try:
-            spawn.expect(r"Commit complete", timeout=commit_timeout)
+            idx = spawn.expect(
+                [r"Commit complete",
+                 r"% No modifications to commit"],
+                timeout=commit_timeout,
+            )
             _commit_done = True
-            log.info("ArcOS Configure: commit complete")
+            if idx == 0:
+                log.info("ArcOS Configure: commit complete")
+            else:
+                log.info("ArcOS Configure: no modifications to commit (no-op)")
         except Exception:
             # Timeout — may be blocking at "Proceed? [yes,no]"
             log.info(
@@ -109,7 +116,11 @@ class Configure(GenericConfigure):
             )
             spawn.sendline("yes")
             try:
-                spawn.expect(r"Commit complete", timeout=30)
+                idx = spawn.expect(
+                    [r"Commit complete",
+                     r"% No modifications to commit"],
+                    timeout=30,
+                )
                 _commit_done = True
                 log.info("ArcOS Configure: commit complete (via Proceed prompt)")
             except Exception as exc:
