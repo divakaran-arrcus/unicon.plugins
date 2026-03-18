@@ -29,6 +29,7 @@ class ArcosSettings(GenericSettings):
             r"Error:",
             r"Commit failed",
             r"Configuration commit failed",
+            r"Aborted:",
         ]
 
         # Configure mode settings
@@ -39,7 +40,7 @@ class ArcosSettings(GenericSettings):
         self.EXEC_TIMEOUT = 30
 
         # Commit settings
-        self.COMMIT_TIMEOUT = 60
+        self.COMMIT_TIMEOUT = 120
 
         # Transition settings
         self.BASH_TO_EXEC_COMMAND = "cli"
