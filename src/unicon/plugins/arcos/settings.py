@@ -40,7 +40,8 @@ class ArcosSettings(GenericSettings):
         self.EXEC_TIMEOUT = 30
 
         # Commit settings
-        self.COMMIT_TIMEOUT = 120
+        # Some operations (e.g., flex-algo admin-groups) need longer commits
+        self.COMMIT_TIMEOUT = 300
 
         # Transition settings
         self.BASH_TO_EXEC_COMMAND = "cli"
