@@ -75,7 +75,7 @@ class Rollback(BaseService):
         p = ArcosPatterns()
 
         # ── Stage 1: rollback configuration <sno> ────────────────────────
-        log.info("ArcOS Rollback: rollback configuration %s", sno)
+        log.debug("ArcOS Rollback: rollback configuration %s", sno)
         spawn.sendline(f"rollback configuration {sno}")
 
         # Rollback stages to candidate config quickly — just wait for
@@ -83,7 +83,7 @@ class Rollback(BaseService):
         self._drain_to_config_prompt(spawn, p)
 
         # ── Stage 2: commit ──────────────────────────────────────────────
-        log.info("ArcOS Rollback: committing")
+        log.debug("ArcOS Rollback: committing")
         spawn.sendline("commit")
 
         _commit_done = False
@@ -92,7 +92,7 @@ class Rollback(BaseService):
         try:
             spawn.expect(r"Commit complete", timeout=timeout)
             _commit_done = True
-            log.info("ArcOS Rollback: commit complete")
+            log.debug("ArcOS Rollback: commit complete")
         except Exception:
             # Timeout — either blocking Proceed? or commit abort/no-mod.
             # Try sending "yes" in case device is blocking at Proceed?.
@@ -121,7 +121,7 @@ class Rollback(BaseService):
         self._drain_all_pending(spawn, p)
 
         # ── Stage 3: return to exec mode ─────────────────────────────────
-        log.info("ArcOS Rollback: sending 'end' to return to exec mode")
+        log.debug("ArcOS Rollback: sending 'end' to return to exec mode")
         spawn.sendline("end")
         try:
             spawn.expect(p.exec_prompt, timeout=_SETTLE_TIMEOUT)
@@ -130,7 +130,7 @@ class Rollback(BaseService):
 
         # update_cur_state() is the correct API — current_state is read-only.
         self.connection.state_machine.update_cur_state("enable")
-        log.info("ArcOS Rollback: rollback complete — now in exec mode")
+        log.debug("ArcOS Rollback: rollback complete — now in exec mode")
 
     # ------------------------------------------------------------------
     # Private helpers

@@ -78,7 +78,7 @@ class Load(BaseService):
         p = ArcosPatterns()
 
         # ── Stage 1: load override ─────────────────────────────────────────
-        log.info("ArcOS Load: load override %s", remote_path)
+        log.debug("ArcOS Load: load override %s", remote_path)
         spawn.sendline(f"load override {remote_path}")
 
         # Spinner lines pass through; we wait for the terminal line:
@@ -99,7 +99,7 @@ class Load(BaseService):
                 f"load override '{remote_path}' failed: {error_text.strip()}"
             )
 
-        log.info("ArcOS Load: load override succeeded")
+        log.debug("ArcOS Load: load override succeeded")
         # Wait for the config prompt to ensure load output is fully consumed,
         # then drain any async messages (process restarts emit "Aborted:" or
         # "Subsystem stopped:" lines that must not bleed into commit).
@@ -107,7 +107,7 @@ class Load(BaseService):
         self._drain_all_pending(spawn, p)
 
         # ── Stage 2: commit ────────────────────────────────────────────────
-        log.info("ArcOS Load: committing")
+        log.debug("ArcOS Load: committing")
         spawn.sendline("commit")
 
         # Match ONLY "Commit complete".  Do NOT include "Aborted:" or
@@ -132,7 +132,7 @@ class Load(BaseService):
         try:
             spawn.expect(r"Commit complete", timeout=timeout)
             _commit_done = True
-            log.info("ArcOS Load: commit complete")
+            log.debug("ArcOS Load: commit complete")
         except Exception:
             # Timeout — either blocking Proceed? or commit abort/no-mod.
             # Try sending "yes" in case device is blocking at Proceed?.
@@ -161,7 +161,7 @@ class Load(BaseService):
         self._drain_all_pending(spawn, p)
 
         # ── Stage 4: return to exec mode ──────────────────────────────────
-        log.info("ArcOS Load: sending 'end' to return to exec mode")
+        log.debug("ArcOS Load: sending 'end' to return to exec mode")
         spawn.sendline("end")
         try:
             spawn.expect(p.exec_prompt, timeout=_SETTLE_TIMEOUT)
@@ -170,7 +170,7 @@ class Load(BaseService):
 
         # update_cur_state() is the correct API — current_state is read-only.
         self.connection.state_machine.update_cur_state("enable")
-        log.info("ArcOS Load: load_config complete — now in exec mode")
+        log.debug("ArcOS Load: load_config complete — now in exec mode")
 
     # ------------------------------------------------------------------
     # Private helpers

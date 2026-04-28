@@ -91,7 +91,7 @@ class Configure(GenericConfigure):
         # Now handle commit with raw spawn.expect() (spinner-safe)
         spawn = self.get_handle()
 
-        log.info("ArcOS Configure: committing configuration")
+        log.debug("ArcOS Configure: committing configuration")
         spawn.sendline("commit")
 
         _commit_done = False
@@ -105,9 +105,9 @@ class Configure(GenericConfigure):
             )
             _commit_done = True
             if idx == 0:
-                log.info("ArcOS Configure: commit complete")
+                log.debug("ArcOS Configure: commit complete")
             else:
-                log.info("ArcOS Configure: no modifications to commit (no-op)")
+                log.debug("ArcOS Configure: no modifications to commit (no-op)")
         except Exception:
             # Timeout — may be blocking at "Proceed? [yes,no]"
             log.info(
@@ -140,7 +140,7 @@ class Configure(GenericConfigure):
             raise SubCommandFailure(f"commit failed: {_commit_error}")
 
         # Transition to enable mode
-        log.info("ArcOS Configure: sending 'end' to return to exec mode")
+        log.debug("ArcOS Configure: sending 'end' to return to exec mode")
         spawn.sendline("end")
         try:
             spawn.expect(patterns.exec_prompt, timeout=_SETTLE_TIMEOUT)
