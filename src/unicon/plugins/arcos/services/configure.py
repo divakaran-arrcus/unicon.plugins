@@ -100,14 +100,21 @@ class Configure(GenericConfigure):
         try:
             idx = spawn.expect(
                 [r"Commit complete",
-                 r"% No modifications to commit"],
+                 r"% No modifications to commit",
+                 patterns.commit_aborted],
                 timeout=commit_timeout,
             )
-            _commit_done = True
-            if idx == 0:
-                log.debug("ArcOS Configure: commit complete")
+            if idx == 2:
+                # confd rejected the commit outright (e.g. "Aborted: Only
+                # locator-node-length = 16 is supported for usid") — fail
+                # fast with the reason instead of waiting out commit_timeout.
+                _commit_error = f"commit aborted: {self._match_text(spawn)}"
             else:
-                log.debug("ArcOS Configure: no modifications to commit (no-op)")
+                _commit_done = True
+                if idx == 0:
+                    log.debug("ArcOS Configure: commit complete")
+                else:
+                    log.debug("ArcOS Configure: no modifications to commit (no-op)")
         except Exception:
             # Timeout — may be blocking at "Proceed? [yes,no]"
             log.info(
@@ -118,11 +125,15 @@ class Configure(GenericConfigure):
             try:
                 idx = spawn.expect(
                     [r"Commit complete",
-                     r"% No modifications to commit"],
+                     r"% No modifications to commit",
+                     patterns.commit_aborted],
                     timeout=30,
                 )
-                _commit_done = True
-                log.info("ArcOS Configure: commit complete (via Proceed prompt)")
+                if idx == 2:
+                    _commit_error = f"commit aborted: {self._match_text(spawn)}"
+                else:
+                    _commit_done = True
+                    log.info("ArcOS Configure: commit complete (via Proceed prompt)")
             except Exception as exc:
                 _commit_error = (
                     f"commit did not produce 'Commit complete': {exc}"
@@ -147,3 +158,13 @@ class Configure(GenericConfigure):
         except Exception:
             pass
         self.connection.state_machine.update_cur_state("enable")
+
+    @staticmethod
+    def _match_text(spawn):
+        """Return the text of the most recent spawn.expect() match."""
+        match = getattr(spawn, "match_re", None) or getattr(spawn, "match", None)
+        if match is None:
+            return "unknown error"
+        if hasattr(match, "group"):
+            return match.group(0)
+        return str(match)
