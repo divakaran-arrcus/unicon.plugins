@@ -97,32 +97,48 @@ class Configure(GenericConfigure):
         _commit_done = False
         _commit_error = None
 
+        # Recognize an explicit device rejection ("Aborted: ..." / "Commit
+        # failed ...") alongside success. A rejected commit never produces a
+        # success string, so matching it here lets us fail fast (~1s) via the
+        # existing abort/recover path instead of waiting the full
+        # COMMIT_TIMEOUT and then a needless "yes" Proceed retry.
+        _commit_expect = [
+            r"Commit complete",
+            r"% No modifications to commit",
+            patterns.commit_aborted,
+            patterns.commit_failed,
+        ]
+
+        def _reject_reason():
+            try:
+                return str(spawn.match.match_output).strip().splitlines()[-1][:200]
+            except Exception:
+                return "commit aborted/failed"
+
         try:
-            idx = spawn.expect(
-                [r"Commit complete",
-                 r"% No modifications to commit"],
-                timeout=commit_timeout,
-            )
-            _commit_done = True
-            if idx == 0:
-                log.debug("ArcOS Configure: commit complete")
+            idx = spawn.expect(_commit_expect, timeout=commit_timeout)
+            if idx in (2, 3):
+                _commit_error = f"commit rejected by device: {_reject_reason()}"
             else:
-                log.debug("ArcOS Configure: no modifications to commit (no-op)")
+                _commit_done = True
+                if idx == 0:
+                    log.debug("ArcOS Configure: commit complete")
+                else:
+                    log.debug("ArcOS Configure: no modifications to commit (no-op)")
         except Exception:
-            # Timeout — may be blocking at "Proceed? [yes,no]"
+            # Genuine timeout — may be blocking at "Proceed? [yes,no]"
             log.info(
                 "ArcOS Configure: commit timed out, sending 'yes' "
                 "for possible Proceed prompt"
             )
             spawn.sendline("yes")
             try:
-                idx = spawn.expect(
-                    [r"Commit complete",
-                     r"% No modifications to commit"],
-                    timeout=30,
-                )
-                _commit_done = True
-                log.info("ArcOS Configure: commit complete (via Proceed prompt)")
+                idx = spawn.expect(_commit_expect, timeout=30)
+                if idx in (2, 3):
+                    _commit_error = f"commit rejected by device: {_reject_reason()}"
+                else:
+                    _commit_done = True
+                    log.info("ArcOS Configure: commit complete (via Proceed prompt)")
             except Exception as exc:
                 _commit_error = (
                     f"commit did not produce 'Commit complete': {exc}"
