@@ -1,11 +1,12 @@
 """Unit tests for the ArcOS Configure service commit-abort handling.
 
 Drives the Configure service's commit logic with a *buffer-driven* mock spawn
-that mimics real ``spawn.expect`` pattern matching against a simulated device
-response. This makes the tests faithful: whether the service fast-fails a
-rejected commit depends on whether its commit ``expect`` recognises the
-device's ``Aborted:`` / ``Commit failed`` line -- exactly the behaviour under
-test -- not on a hard-coded side-effect.
+that mimics real ``spawn.expect`` -- earliest-byte-position matching against a
+simulated device buffer, with buffer consumption -- so the tests are faithful
+to how pexpect actually behaves. In particular this reproduces the case the
+sibling Load service warns about: an async ``Aborted:`` line (from a
+config-triggered process restart) landing in the buffer BEFORE the real
+``Commit complete``.
 
 The config-send (GenericConfigure.call_service) is patched to a no-op so the
 tests isolate the commit path.
@@ -18,16 +19,24 @@ Run with::
 
 import re
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from unicon.core.errors import SubCommandFailure
 from unicon.plugins.generic.service_implementation import Configure as GenericConfigure
 
+# Trailing config prompt arcOS returns to after commit completes / aborts.
+PROMPT = "\nroot@rtr1(config)#"
+
 # Real arcOS device commit responses (captured on the lab via confd_cli).
-COMMIT_COMPLETE = "Commit complete."
-NO_MODIFICATIONS = "% No modifications to commit"
-COMMIT_ABORTED = "Aborted: '': Deletion of front panel interface 'swp1' is not allowed."
-COMMIT_FAILED = "Commit failed: some backend error"
+COMMIT_COMPLETE = "Commit complete." + PROMPT
+NO_MODIFICATIONS = "% No modifications to commit" + PROMPT
+COMMIT_ABORTED = ("Aborted: '': Deletion of front panel interface 'swp1' "
+                  "is not allowed.") + PROMPT
+COMMIT_FAILED = "Commit failed: some backend error" + PROMPT
+# H1 / R1: an async 'Aborted:' from a config-triggered process restart lands in
+# the byte stream BEFORE the real 'Commit complete' -- the commit SUCCEEDS.
+ASYNC_ABORT_THEN_COMPLETE = ("Aborted: Subsystem 'isis' restarted\n"
+                             "Commit complete." + PROMPT)
 
 
 def _pat_str(p):
@@ -35,13 +44,10 @@ def _pat_str(p):
 
 
 class BufferSpawn:
-    """Mock spawn whose ``expect`` matches a list of regex patterns against a
-    simulated device buffer, returning the first matching index or raising a
-    timeout when nothing matches -- like the real spawn.
-
-    ``commit_output`` is what the device emits in response to ``commit``/``yes``.
-    Non-commit expects (e.g. the exec-prompt resync after abort/end) always
-    succeed.
+    """Mock spawn that mimics ``spawn.expect``: earliest-byte-position match of
+    a pattern list against a simulated device buffer, consuming through the
+    match (like pexpect). ``commit``/``yes`` load ``commit_output`` into the
+    buffer. Non-commit expects (exec-prompt resync after abort/end) succeed.
     """
 
     def __init__(self, commit_output, timeout_first=False):
@@ -50,33 +56,42 @@ class BufferSpawn:
         self._commit_expects = 0
         self.sent = []
         self._last = None
-        self.match = MagicMock()
+        self.match_re = None
+        self._buf = ""
 
     def sendline(self, s):
         self.sent.append(s)
         self._last = s
+        if s in ("commit", "yes"):
+            self._buf = self.commit_output
 
     def expect(self, patterns, timeout=None, *args, **kwargs):
         as_list = patterns if isinstance(patterns, (list, tuple)) else [patterns]
         pat_strs = [_pat_str(p) for p in as_list]
-        is_commit_expect = any("Commit complete" in ps for ps in pat_strs)
-        if not is_commit_expect:
-            # exec-prompt / resync expect -- always matches.
-            self.match.match_output = ""
+        # Commit / reject-confirm expects carry a success marker -> drive them
+        # against the buffer. Everything else (exec-prompt resync) just succeeds.
+        if not any("Commit complete" in ps for ps in pat_strs):
+            self._buf = ""
+            self.match_re = None
             return 0
         self._commit_expects += 1
         if self.timeout_first and self._commit_expects == 1:
             raise TimeoutError("Timeout: device blocking at Proceed? prompt")
-        buf = self.commit_output if self._last in ("commit", "yes") else ""
+        best_i, best_m = None, None
         for i, ps in enumerate(pat_strs):
-            if re.search(ps, buf):
-                self.match.match_output = buf
-                return i
-        raise TimeoutError("Timeout: no commit terminal string matched")
+            m = re.search(ps, self._buf, re.MULTILINE)
+            if m and (best_m is None or m.start() < best_m.start()):
+                best_i, best_m = i, m
+        if best_i is None:
+            raise TimeoutError("Timeout: no commit terminal string matched")
+        self.match_re = best_m
+        self._buf = self._buf[best_m.end():]  # consume through the match
+        return best_i
 
 
 def _make_service(spawn):
     from unicon.plugins.arcos.services.configure import Configure
+    from unittest.mock import MagicMock
 
     connection = MagicMock()
     connection.spawn = spawn
@@ -97,7 +112,6 @@ def _run(commit_output, timeout_first=False):
     spawn = BufferSpawn(commit_output, timeout_first=timeout_first)
     service = _make_service(spawn)
     raised = None
-    # Isolate the commit path: no-op the config-send.
     with patch.object(GenericConfigure, "call_service", return_value=None):
         try:
             service.call_service(command=["no interface swp1"])
@@ -106,24 +120,22 @@ def _run(commit_output, timeout_first=False):
     return spawn, service, raised
 
 
-# ---------------------------------------------------------------------------
-# NEW behaviour under test (RED against current code)
-# ---------------------------------------------------------------------------
-
 class TestCommitAbortFastFail(unittest.TestCase):
-    """A commit rejected with 'Aborted:' must fail FAST -- recognised at the
-    commit expect -- not fall through to the 'yes' Proceed retry + full timeout.
-    """
+    """A commit rejected with 'Aborted:' must fail FAST -- no 'yes' Proceed retry."""
+
+    def test_does_not_send_yes(self):
+        spawn, _, _ = _run(COMMIT_ABORTED)
+        self.assertNotIn("yes", spawn.sent)
 
     def test_raises_subcommand_failure(self):
         _, _, raised = _run(COMMIT_ABORTED)
         self.assertIsInstance(raised, SubCommandFailure)
 
-    def test_does_not_send_yes(self):
-        # The 'yes' Proceed retry only makes sense on a genuine timeout. A
-        # device that explicitly Aborted must be recognised immediately.
-        spawn, _, _ = _run(COMMIT_ABORTED)
-        self.assertNotIn("yes", spawn.sent)
+    def test_reason_preserves_device_message(self):
+        # M1: the failure carries the real device reason (via match_re), not a
+        # generic fallback.
+        _, _, raised = _run(COMMIT_ABORTED)
+        self.assertIn("front panel interface", str(raised))
 
     def test_sends_abort_and_recovers_to_enable(self):
         spawn, service, _ = _run(COMMIT_ABORTED)
@@ -132,8 +144,6 @@ class TestCommitAbortFastFail(unittest.TestCase):
 
 
 class TestCommitFailedFastFail(unittest.TestCase):
-    """A commit rejected with 'Commit failed' must also fail fast (no 'yes')."""
-
     def test_does_not_send_yes(self):
         spawn, _, _ = _run(COMMIT_FAILED)
         self.assertNotIn("yes", spawn.sent)
@@ -143,9 +153,18 @@ class TestCommitFailedFastFail(unittest.TestCase):
         self.assertIsInstance(raised, SubCommandFailure)
 
 
-# ---------------------------------------------------------------------------
-# Regression guards for the unchanged success paths (GREEN on current code)
-# ---------------------------------------------------------------------------
+class TestAsyncAbortNoiseTreatedAsSuccess(unittest.TestCase):
+    """H1 / R1: an async 'Aborted:' (process restart) that lands BEFORE the real
+    'Commit complete' must NOT fail the commit -- it succeeded."""
+
+    def test_commit_succeeds_despite_async_abort(self):
+        _, _, raised = _run(ASYNC_ABORT_THEN_COMPLETE)
+        self.assertIsNone(raised)
+
+    def test_does_not_abort_the_candidate(self):
+        spawn, _, _ = _run(ASYNC_ABORT_THEN_COMPLETE)
+        self.assertNotIn("abort", spawn.sent)
+
 
 class TestCommitSuccessPathsUnchanged(unittest.TestCase):
 
@@ -163,11 +182,9 @@ class TestCommitSuccessPathsUnchanged(unittest.TestCase):
 
 
 class TestCommitTimeoutPaths(unittest.TestCase):
-    """The abort fix also touches the genuine-timeout -> 'yes' Proceed branch;
-    guard that it still behaves correctly."""
+    """The abort fix also touches the genuine-timeout -> 'yes' Proceed branch."""
 
     def test_proceed_prompt_commit_succeeds(self):
-        # Device blocks until 'yes' (Proceed?), then commits -> success via yes.
         spawn, service, raised = _run(COMMIT_COMPLETE, timeout_first=True)
         self.assertIsNone(raised)
         self.assertIn("yes", spawn.sent)
@@ -175,9 +192,7 @@ class TestCommitTimeoutPaths(unittest.TestCase):
         service.connection.state_machine.update_cur_state.assert_called_with("enable")
 
     def test_genuine_timeout_raises_via_yes_then_abort(self):
-        # No terminal string ever appears -> genuine timeout: yes IS tried,
-        # then abort + SubCommandFailure (contrast with the fast-fail abort).
-        spawn, _, raised = _run("")
+        spawn, _, raised = _run("")  # no terminal string ever appears
         self.assertIsInstance(raised, SubCommandFailure)
         self.assertIn("yes", spawn.sent)
         self.assertIn("abort", spawn.sent)

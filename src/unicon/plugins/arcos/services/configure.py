@@ -98,33 +98,59 @@ class Configure(GenericConfigure):
         _commit_error = None
 
         # Recognize an explicit device rejection ("Aborted: ..." / "Commit
-        # failed ...") alongside success. A rejected commit never produces a
-        # success string, so matching it here lets us fail fast (~1s) via the
-        # existing abort/recover path instead of waiting the full
-        # COMMIT_TIMEOUT and then a needless "yes" Proceed retry.
+        # failed ...") alongside success, so we can fail fast via the existing
+        # abort/recover path instead of waiting the full COMMIT_TIMEOUT + a
+        # needless "yes" Proceed retry.
         _commit_expect = [
             r"Commit complete",
             r"% No modifications to commit",
             patterns.commit_aborted,
             patterns.commit_failed,
         ]
+        # A matched "Aborted:"/"Commit failed" is only a CANDIDATE reject: an
+        # async "Aborted:" from a config-triggered process restart can land in
+        # the byte stream BEFORE the real "Commit complete" (the arcOS Load
+        # service documents the same hazard), and pexpect matches the earliest
+        # position. Disambiguate by re-scanning: a genuine abort returns to the
+        # config prompt with no success marker; async noise is followed by the
+        # real success marker.
+        _reject_confirm = [
+            r"Commit complete",
+            r"% No modifications to commit",
+            patterns.config_prompt,
+        ]
 
         def _reject_reason():
+            # Mirror Load._match_text -- the matched text is on match_re/match.
+            m = getattr(spawn, "match_re", None) or getattr(spawn, "match", None)
             try:
-                return str(spawn.match.match_output).strip().splitlines()[-1][:200]
+                if m is not None and hasattr(m, "group"):
+                    return m.group(0).strip().splitlines()[-1][:200]
             except Exception:
-                return "commit aborted/failed"
+                pass
+            return "commit aborted/failed"
+
+        def _resolve(index):
+            """Map a commit-expect index to (done, error), disambiguating a
+            candidate reject (index 2/3) from pre-commit async noise."""
+            if index in (0, 1):
+                return True, None
+            reason = _reject_reason()
+            try:
+                j = spawn.expect(_reject_confirm, timeout=commit_timeout)
+            except Exception:
+                return False, f"commit rejected by device: {reason}"
+            if j in (0, 1):
+                # Real success marker followed the async "Aborted:" -> the
+                # commit actually completed; the rejection was noise.
+                return True, None
+            return False, f"commit rejected by device: {reason}"
 
         try:
             idx = spawn.expect(_commit_expect, timeout=commit_timeout)
-            if idx in (2, 3):
-                _commit_error = f"commit rejected by device: {_reject_reason()}"
-            else:
-                _commit_done = True
-                if idx == 0:
-                    log.debug("ArcOS Configure: commit complete")
-                else:
-                    log.debug("ArcOS Configure: no modifications to commit (no-op)")
+            _commit_done, _commit_error = _resolve(idx)
+            if _commit_done:
+                log.debug("ArcOS Configure: commit complete / no modifications")
         except Exception:
             # Genuine timeout — may be blocking at "Proceed? [yes,no]"
             log.info(
@@ -134,10 +160,8 @@ class Configure(GenericConfigure):
             spawn.sendline("yes")
             try:
                 idx = spawn.expect(_commit_expect, timeout=30)
-                if idx in (2, 3):
-                    _commit_error = f"commit rejected by device: {_reject_reason()}"
-                else:
-                    _commit_done = True
+                _commit_done, _commit_error = _resolve(idx)
+                if _commit_done:
                     log.info("ArcOS Configure: commit complete (via Proceed prompt)")
             except Exception as exc:
                 _commit_error = (
