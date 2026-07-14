@@ -14,5 +14,19 @@ enable:
       Arrcus ArcOS mock version 1.0.0
       Copyright (c) Arrcus, Inc.
 
+    "config":
+      new_state: config
     "exit":
+      new_state: bash
+
+config:
+  prompt: "root@%N(config)# "
+  commands:
+    "interface swp1": ""
+    "commit": |2
+      Commit complete.
+
+    "end":
+      new_state: enable
+    "end\rexit":
       new_state: bash
