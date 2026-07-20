@@ -56,11 +56,6 @@ class ArcosSettings(GenericSettings):
         self.COMMIT_COMMAND = "commit"
         self.ABORT_COMMAND = "abort"
 
-        # Prompt patterns (can be overridden)
-        self.BASH_PROMPT = r"^.*root@[^\s]+[#$]\s*$"
-        self.EXEC_PROMPT = r"^.*[^@\s]+#\s*$"
-        self.CONFIG_PROMPT = r"^.*\(config[^\)]*\)#\s*$"
-
         # Enable/disable features
         self.IGNORE_CHATTY_TERM_OUTPUT = True
         self.TERM = "vt100"

@@ -10,6 +10,8 @@ import yaml
 import unittest
 
 from unicon import Connection
+from unicon.plugins.arcos import ArcosServiceList
+from unicon.plugins.arcos.services import Configure, Execute, Load, Rollback
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -111,6 +113,18 @@ class TestArcosPluginConfigure(unittest.TestCase):
         c.configure("interface swp1", commit=False)
         self.assertTrue(c.state_machine.current_state == "enable")
         c.disconnect()
+
+
+class TestArcosServiceListRegistration(unittest.TestCase):
+    """Confirm Load/Rollback (and Configure/Execute) are wired into the
+    ArcOS ServiceList so ``device.load()``/``device.rollback()`` resolve."""
+
+    def test_service_list_exposes_load_and_rollback(self):
+        service_list = ArcosServiceList()
+        self.assertIs(service_list.configure, Configure)
+        self.assertIs(service_list.execute, Execute)
+        self.assertIs(service_list.load, Load)
+        self.assertIs(service_list.rollback, Rollback)
 
 
 if __name__ == "__main__":
