@@ -13,16 +13,6 @@ from .patterns import ArcosPatterns
 patterns = ArcosPatterns()
 
 
-def send_password(spawn, password):
-    """Send password when prompted."""
-    spawn.sendline(password)
-
-
-def send_username(spawn, username):
-    """Send username when prompted."""
-    spawn.sendline(username)
-
-
 def send_yes(spawn):
     """Send 'yes' for confirmation prompts."""
     spawn.sendline("yes")
@@ -35,32 +25,6 @@ def send_return(spawn):
 
 class ArcosStatements:
     """Collection of common dialog statements for ArcOS."""
-
-    @classmethod
-    def username_statement(cls, context):
-        """Statement for handling username prompts."""
-        return Statement(
-            pattern=patterns.username_prompt,
-            action=lambda spawn: send_username(
-                spawn, context.get("username", context.get("default_username", "root"))
-            ),
-            args=None,
-            loop_continue=True,
-            continue_timer=False,
-        )
-
-    @classmethod
-    def password_statement(cls, context):
-        """Statement for handling password prompts."""
-        return Statement(
-            pattern=patterns.password_prompt,
-            action=lambda spawn: send_password(
-                spawn, context.get("password", context.get("default_password", ""))
-            ),
-            args=None,
-            loop_continue=True,
-            continue_timer=False,
-        )
 
     @classmethod
     def confirm_statement(cls):

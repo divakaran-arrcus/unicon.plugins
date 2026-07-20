@@ -12,7 +12,7 @@ from unicon.bases.routers.connection import BaseSingleRpConnection
 from .statemachine import ArcosStateMachine
 from .settings import ArcosSettings
 from .connection_provider import ArcosConnectionProvider
-from .services import Configure, Execute
+from .services import Configure, Execute, Load, Rollback
 
 
 class ArcosServiceList(ServiceList):
@@ -22,6 +22,8 @@ class ArcosServiceList(ServiceList):
         super().__init__()
         self.configure = Configure
         self.execute = Execute
+        self.load = Load
+        self.rollback = Rollback
 
 
 class ArcosSingleRpConnection(BaseSingleRpConnection):
