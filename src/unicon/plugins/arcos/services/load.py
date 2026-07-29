@@ -126,12 +126,10 @@ class Load(BaseService):
         # appears and we time out; the timeout handler sends "yes".
         # For real commit aborts, the config prompt appears without
         # "Commit complete"; we time out and report the failure.
-        _commit_done = False
         _commit_error = None
 
         try:
             spawn.expect(r"Commit complete", timeout=timeout)
-            _commit_done = True
             log.debug("ArcOS Load: commit complete")
         except Exception:
             # Timeout — either blocking Proceed? or commit abort/no-mod.
@@ -143,7 +141,6 @@ class Load(BaseService):
             spawn.sendline("yes")
             try:
                 spawn.expect(r"Commit complete", timeout=30)
-                _commit_done = True
                 log.info(
                     "ArcOS Load: commit complete (via proceed prompt)"
                 )
