@@ -86,12 +86,10 @@ class Rollback(BaseService):
         log.debug("ArcOS Rollback: committing")
         spawn.sendline("commit")
 
-        _commit_done = False
         _commit_error = None
 
         try:
             spawn.expect(r"Commit complete", timeout=timeout)
-            _commit_done = True
             log.debug("ArcOS Rollback: commit complete")
         except Exception:
             # Timeout — either blocking Proceed? or commit abort/no-mod.
@@ -103,7 +101,6 @@ class Rollback(BaseService):
             spawn.sendline("yes")
             try:
                 spawn.expect(r"Commit complete", timeout=30)
-                _commit_done = True
                 log.info(
                     "ArcOS Rollback: commit complete (via proceed prompt)"
                 )

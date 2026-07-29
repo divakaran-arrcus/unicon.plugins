@@ -94,7 +94,6 @@ class Configure(GenericConfigure):
         log.debug("ArcOS Configure: committing configuration")
         spawn.sendline("commit")
 
-        _commit_done = False
         _commit_error = None
 
         try:
@@ -103,7 +102,6 @@ class Configure(GenericConfigure):
                  r"% No modifications to commit"],
                 timeout=commit_timeout,
             )
-            _commit_done = True
             if idx == 0:
                 log.debug("ArcOS Configure: commit complete")
             else:
@@ -121,7 +119,6 @@ class Configure(GenericConfigure):
                      r"% No modifications to commit"],
                     timeout=30,
                 )
-                _commit_done = True
                 log.info("ArcOS Configure: commit complete (via Proceed prompt)")
             except Exception as exc:
                 _commit_error = (
