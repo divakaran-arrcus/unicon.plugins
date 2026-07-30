@@ -39,21 +39,24 @@ New
           state (``config`` or ``enable``) afterwards.
         * ``Load`` service (``device.load(remote_path)``): stages
           ``load override <remote_path>`` then ``commit`` then ``end``,
-          matching the success ("N KiB parsed in N sec"), error, and
-          commit-complete/aborted/proceed terminal lines, with buffer
-          draining to avoid async subsystem-restart messages
-          (``Aborted:``, ``Subsystem stopped:``) bleeding into the commit
-          match. On failure sends ``abort`` and raises
-          ``SubCommandFailure``, always returning the state machine to
-          ``enable``.
+          matching the load stage's success ("N KiB parsed in N sec") or
+          error line, then matching only "Commit complete" (or a
+          blocking ``Proceed? [yes,no]`` prompt) for the commit stage,
+          with a commit failure inferred via timeout rather than a
+          literal ``Aborted:`` match, and buffer draining to avoid async
+          subsystem-restart messages (``Aborted:``, ``Subsystem
+          stopped:``) bleeding into the commit match. On failure sends
+          ``abort`` and raises ``SubCommandFailure``, always returning
+          the state machine to ``enable``.
         * ``Rollback`` service (``device.rollback(sno=0)``): stages
           ``rollback configuration <sno>`` then ``commit`` then ``end``,
-          with the same commit-complete/proceed/abort handling and
-          guaranteed end-state as ``Load``.
-        * Mock-based unit tests: connect/execute smoke tests
-          (``tests/test_plugin_arcos.py``) against a new
-          ``tests/mock_data/arcos/arcos_mock_data.yaml`` mock device, plus
+          with the same commit-complete/proceed handling (a commit
+          failure is likewise inferred via timeout, not a literal
+          ``Aborted:`` match) and guaranteed end-state as ``Load``.
+        * Mock-based unit tests: connect/execute smoke tests, plus
           dedicated config-mode statemachine transition and Configure
-          service tests (with and without auto-commit) in
-          ``arcos/tests/test_arcos_load_service.py``, extending the arcos
-          mock device data with a config state.
+          service tests (with and without auto-commit), in
+          ``tests/test_plugin_arcos.py`` against a new
+          ``tests/mock_data/arcos/arcos_mock_data.yaml`` mock device
+          extended with a config state; Load service success, failure,
+          and timeout tests in ``arcos/tests/test_arcos_load_service.py``.
