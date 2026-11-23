@@ -41,7 +41,7 @@ class TestArcosPluginConnect(unittest.TestCase):
             os="arcos",
             platform="arcos",
             username="root",
-            password="arrcus",
+            password="cisco",
             init_exec_commands=[],
             init_config_commands=[],
         )
@@ -66,7 +66,7 @@ class TestArcosPluginExecute(unittest.TestCase):
             os="arcos",
             platform="arcos",
             username="root",
-            password="arrcus",
+            password="cisco",
             init_exec_commands=[],
             init_config_commands=[],
         )
@@ -94,7 +94,7 @@ class TestArcosPluginConfigure(unittest.TestCase):
             os="arcos",
             platform="arcos",
             username="root",
-            password="arrcus",
+            password="cisco",
             init_exec_commands=[],
             init_config_commands=[],
         )
